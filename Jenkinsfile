@@ -4,8 +4,8 @@ pipeline {
     environment {
         // Jenkins connection – CHANGE THESE!
         JENKINS_URL = 'http://54.188.28.149:8080/'   // your Jenkins URL
-        ADMIN_USER = 'admin'                                 // admin username
-        ADMIN_TOKEN = credentials('jenkins-admin-token')     // secret text credential
+        ADMIN_USER = 'admin'
+        ADMIN_TOKEN = credentials('jenkins-admin-token')
 
         // SMTP (Gmail app password) – CHANGE THESE!
         SMTP_CREDS = credentials('smtp-creds')
@@ -27,10 +27,26 @@ pipeline {
             }
         }
 
+        stage('Bootstrap pip (no system packages)') {
+            steps {
+                sh '''
+                    # Download get-pip.py using Python's built-in urllib (no wget/curl required)
+                    python3 -c "import urllib.request; urllib.request.urlretrieve('https://bootstrap.pypa.io/get-pip.py', 'get-pip.py')"
+                    
+                    # Install pip locally for the Jenkins user
+                    python3 get-pip.py --user
+                    
+                    # Clean up
+                    rm get-pip.py
+                '''
+            }
+        }
+
         stage('Install Python Dependencies') {
             steps {
                 sh '''
-                    # Install Python packages for the Jenkins user only
+                    # Use the freshly installed local pip
+                    export PATH=$HOME/.local/bin:$PATH
                     pip install --user --upgrade pip
                     pip install --user requests urllib3
                 '''
@@ -40,7 +56,7 @@ pipeline {
         stage('Provision Users') {
             steps {
                 sh '''
-                    # Add user's local Python bin to PATH (so installed packages are found)
+                    # Add local Python bin to PATH
                     export PATH=$HOME/.local/bin:$PATH
                     python3 provision_jenkins_users.py
                 '''
@@ -52,12 +68,12 @@ pipeline {
         always {
             archiveArtifacts artifacts: 'users.csv, provision_jenkins_users.py', fingerprint: true
         }
-        failure {
-            emailext(
-                subject: "User Provisioning FAILED - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: "Check console: ${env.BUILD_URL}console",
-                to: 'your.name@gmail.com'   // CHANGE to your email / team
-            )
-        }
+        // failure {   <-- COMMENTED OUT to avoid SMTP configuration errors
+        //     emailext(
+        //         subject: "User Provisioning FAILED - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+        //         body: "Check console: ${env.BUILD_URL}console",
+        //         to: 'your.name@gmail.com'
+        //     )
+        // }
     }
 }
