@@ -1,4 +1,4 @@
-email,username,role
-adityatripathi022@gmail.com,aditya.admin,admin
-aditya.tripathi@opstree.com,aditya.dev,developer
-atbusiness1997@gmail.com,aditya.devops,devops
+username,email,role
+aditya_admin,adityatripathi022@gmail.com,admin
+aditya_dev,aditya.tripathi@opstree.com,developer
+aditya_devops,atbusiness1997@gmail.com,devops
