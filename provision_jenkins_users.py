@@ -165,22 +165,18 @@ def create_user(username, password, email, fullname=None):
             raise RuntimeError(f"User '{username}' was reported created but does not exist after creation.")
         return True   # new user created
 
-    # ---------- FAILURE: HTTP 200 (form returned with error) ----------
+    # ---------- HTTP 200: Form returned (usually error) ----------
     elif resp.status_code == 200:
-        logger.debug(f"User creation returned HTTP 200. Checking response body for known errors.")
-        # Look for "User name is already taken"
-        if "User name is already taken" in resp.text:
-            logger.warning(f"User '{username}' already exists (detected via HTML). Proceeding idempotently.")
-            # Verify via API to be sure
-            if user_exists(username):
-                logger.info(f"Confirmed user '{username}' exists via API.")
-                return False   # user already existed, no creation done
-            else:
-                raise RuntimeError(f"HTML indicated user '{username}' exists, but API check says otherwise.")
+        logger.warning(f"User creation returned HTTP 200. Checking if user already exists via API...")
+        
+        # CRITICAL FIX: Verify existence via reliable API call
+        if user_exists(username):
+            logger.warning(f"User '{username}' already exists (detected via API). Proceeding idempotently.")
+            return False   # user already existed, no creation done
         else:
-            # Some other validation error – log full response for debugging
-            logger.error(f"User creation failed with HTTP 200. Full response body:\n{resp.text[:2000]}")
-            raise RuntimeError(f"Failed to create user {username}: HTTP 200 with unknown error")
+            # Log the full response for debugging
+            logger.error(f"User creation failed with HTTP 200 and user does NOT exist. Full response:\n{resp.text}")
+            raise RuntimeError(f"Failed to create user {username}: HTTP 200 and user does not exist")
 
     # ---------- OTHER HTTP STATUS CODES ----------
     else:
