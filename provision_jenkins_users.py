@@ -188,7 +188,7 @@ def create_user(username, password, email, fullname=None):
 # Jenkins API: Role assignment via Groovy
 # ----------------------------------------------------------------------
 def assign_role(username, role):
-    """Assign a global role to the user. Raises exception on failure."""
+    """Assign a global role to the user via Groovy, with output validation."""
     # Step 1: Verify that the role exists in Jenkins
     groovy_check = f"""
 import jenkins.model.*
@@ -219,7 +219,7 @@ println "OK: Role exists"
     if "ERROR" in check_resp.text:
         raise RuntimeError(f"Role validation failed: {check_resp.text.strip()}")
 
-    # Step 2: Assign the role
+    # Step 2: Assign the role (corrected method: doAssignRole)
     groovy_assign = f"""
 import jenkins.model.*
 import com.michelin.cio.hudson.plugins.rolestrategy.*
@@ -227,7 +227,7 @@ import com.michelin.cio.hudson.plugins.rolestrategy.*
 def jenkins = Jenkins.getInstance()
 def strategy = jenkins.getAuthorizationStrategy()
 if (strategy instanceof RoleBasedAuthorizationStrategy) {{
-    strategy.assignRole(RoleBasedAuthorizationStrategy.GLOBAL, "{role}", "{username}")
+    strategy.doAssignRole(RoleBasedAuthorizationStrategy.GLOBAL, "{role}", "{username}")
     jenkins.save()
     println "ASSIGNED"
 }} else {{
@@ -246,33 +246,6 @@ if (strategy instanceof RoleBasedAuthorizationStrategy) {{
         logger.error(f"Role assignment failed. Script output: {assign_resp.text}")
         raise RuntimeError(f"Failed to assign role {role} to {username}")
     logger.info(f"Role '{role}' assigned to '{username}'.")
-
-def get_current_role(username):
-    """Return the current global role of the user, or None if none assigned."""
-    groovy_script = f"""
-import jenkins.model.*
-import com.michelin.cio.hudson.plugins.rolestrategy.*
-
-def jenkins = Jenkins.getInstance()
-def strategy = jenkins.getAuthorizationStrategy()
-if (strategy instanceof RoleBasedAuthorizationStrategy) {{
-    def roles = strategy.getGrantedRoles(RoleBasedAuthorizationStrategy.GLOBAL)
-    def userRole = roles.find {{ it.value.contains("{username}") }}?.key?.name
-    println userRole ?: "NONE"
-}} else {{
-    println "NONE"
-}}
-"""
-    url = f"{JENKINS_URL}/scriptText"
-    resp = requests_retry_session().post(
-        url,
-        auth=(ADMIN_USER, ADMIN_TOKEN),
-        data={"script": groovy_script},
-        timeout=15
-    )
-    resp.raise_for_status()
-    role = resp.text.strip()
-    return None if role == "NONE" else role
 
 # ----------------------------------------------------------------------
 # Email notification (only for new users)
